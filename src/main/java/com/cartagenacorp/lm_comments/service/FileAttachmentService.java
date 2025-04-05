@@ -5,6 +5,7 @@ import com.cartagenacorp.lm_comments.entity.FileAttachment;
 import com.cartagenacorp.lm_comments.exception.FileStorageException;
 import com.cartagenacorp.lm_comments.repository.FileAttachmentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -21,6 +22,9 @@ import java.util.UUID;
 public class FileAttachmentService {
 
     private final FileAttachmentRepository fileAttachmentRepository;
+
+    @Value("${file.upload-dir}")
+    private String uploadDir;
 
     @Autowired
     public FileAttachmentService(FileAttachmentRepository fileAttachmentRepository) {
@@ -46,7 +50,7 @@ public class FileAttachmentService {
 
     private String saveFileToStorage(MultipartFile file) {
         try {
-            String uploadDir = System.getProperty("user.home") + "/Desktop/app-uploads/";
+            Files.createDirectories(Paths.get(uploadDir));
 
             String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
             Path filePath = Paths.get(uploadDir, fileName);
