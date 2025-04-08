@@ -1,11 +1,14 @@
 package com.cartagenacorp.lm_comments.service;
 
 import com.cartagenacorp.lm_comments.dto.CommentDTO;
+import com.cartagenacorp.lm_comments.dto.PageResponseDTO;
 import com.cartagenacorp.lm_comments.entity.Comment;
 import com.cartagenacorp.lm_comments.entity.FileAttachment;
 import com.cartagenacorp.lm_comments.mapper.CommentMapper;
 import com.cartagenacorp.lm_comments.repository.CommentRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,8 +42,9 @@ public class CommentService {
     }
 
     @Transactional(readOnly = true)
-    public List<CommentDTO> getCommentsByIssueId(UUID issueId) {
-        return commentMapper.commentsToCommentDTOs(commentRepository.findByIssueId(issueId));
+    public PageResponseDTO<CommentDTO> getCommentsByIssueId(UUID issueId, Pageable pageable) {
+        Page<Comment> commentPage = commentRepository.findByIssueId(issueId, pageable);
+        return new PageResponseDTO<>(commentPage.map(comment -> commentMapper.commentToCommentDTO(comment)));
     }
 
     @Transactional

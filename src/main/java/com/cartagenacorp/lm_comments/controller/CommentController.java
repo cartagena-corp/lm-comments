@@ -1,10 +1,12 @@
 package com.cartagenacorp.lm_comments.controller;
 
 import com.cartagenacorp.lm_comments.dto.CommentDTO;
-import com.cartagenacorp.lm_comments.entity.Comment;
 import com.cartagenacorp.lm_comments.exception.FileStorageException;
 import com.cartagenacorp.lm_comments.service.CommentService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -26,10 +28,12 @@ public class CommentController {
     }
 
     @GetMapping("/{issueId}")
-    public ResponseEntity<?> getCommentsByIssue(@PathVariable String issueId) {
+    public ResponseEntity<?> getCommentsByIssue(
+            @PathVariable String issueId,
+            @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
         try {
             UUID uuid = UUID.fromString(issueId);
-            return ResponseEntity.ok(commentService.getCommentsByIssueId(uuid));
+            return ResponseEntity.ok(commentService.getCommentsByIssueId(uuid, pageable));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid uuid");
         } catch (Exception ex) {
