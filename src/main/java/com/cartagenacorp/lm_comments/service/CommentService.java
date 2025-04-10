@@ -6,6 +6,7 @@ import com.cartagenacorp.lm_comments.entity.Comment;
 import com.cartagenacorp.lm_comments.entity.FileAttachment;
 import com.cartagenacorp.lm_comments.mapper.CommentMapper;
 import com.cartagenacorp.lm_comments.repository.CommentRepository;
+import com.cartagenacorp.lm_comments.util.JwtContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -48,13 +49,7 @@ public class CommentService {
     }
 
     @Transactional
-    public void deleteComment(UUID commentId, String token) {
-        UUID userId = userValidationService.getUserIdFromToken(token);
-
-        if(userId == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
-        }
-
+    public void deleteComment(UUID commentId) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found"));
 
@@ -74,12 +69,9 @@ public class CommentService {
     }
 
     @Transactional
-    public CommentDTO saveComment(CommentDTO commentDTO, MultipartFile[] files, String token) {
-        UUID userId = userValidationService.getUserIdFromToken(token);
+    public CommentDTO saveComment(CommentDTO commentDTO, MultipartFile[] files) {
+        UUID userId = JwtContextHolder.getUserId();
 
-        if(userId == null){
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token or user not found");
-        }
         if (!issueValidationService.validateIssueExists(commentDTO.getIssueId())) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The issue ID provided is not valid");
         }

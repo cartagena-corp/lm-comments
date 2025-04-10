@@ -3,6 +3,7 @@ package com.cartagenacorp.lm_comments.controller;
 import com.cartagenacorp.lm_comments.dto.CommentDTO;
 import com.cartagenacorp.lm_comments.exception.FileStorageException;
 import com.cartagenacorp.lm_comments.service.CommentService;
+import com.cartagenacorp.lm_comments.util.RequiresPermission;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -28,6 +29,7 @@ public class CommentController {
     }
 
     @GetMapping("/{issueId}")
+    @RequiresPermission({"COMMENT_CRUD", "COMMENT_READ"})
     public ResponseEntity<?> getCommentsByIssue(
             @PathVariable String issueId,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
@@ -42,15 +44,11 @@ public class CommentController {
     }
 
     @DeleteMapping("/{commentId}")
-    public ResponseEntity<?> deleteComment(@PathVariable String commentId, @RequestHeader("Authorization") String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        String token = authHeader.substring(7);
+    @RequiresPermission({"COMMENT_CRUD"})
+    public ResponseEntity<?> deleteComment(@PathVariable String commentId) {
         try {
             UUID uuid = UUID.fromString(commentId);
-            commentService.deleteComment(uuid, token);
+            commentService.deleteComment(uuid);
             return ResponseEntity.noContent().build();
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Invalid uuid");
@@ -62,18 +60,13 @@ public class CommentController {
     }
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @RequiresPermission({"COMMENT_CRUD"})
     public ResponseEntity<?> createComment(
             @ModelAttribute CommentDTO commentDTO,
-            @RequestPart(value = "files", required = false) MultipartFile[] files,
-            @RequestHeader("Authorization") String authHeader) {
-
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-        String token = authHeader.substring(7);
+            @RequestPart(value = "files", required = false) MultipartFile[] files) {
 
         try {
-            CommentDTO savedComment = commentService.saveComment(commentDTO, files, token);
+            CommentDTO savedComment = commentService.saveComment(commentDTO, files);
             return ResponseEntity.status(HttpStatus.CREATED).body(savedComment);
         } catch (FileStorageException ex) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Error saving files");
