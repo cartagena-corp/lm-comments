@@ -26,6 +26,9 @@ public class FileAttachmentService {
     @Value("${file.upload-dir}")
     private String uploadDir;
 
+    @Value("${app.upload-access-url}")
+    private String uploadAccessUrl;
+
     @Autowired
     public FileAttachmentService(FileAttachmentRepository fileAttachmentRepository) {
         this.fileAttachmentRepository = fileAttachmentRepository;
@@ -56,7 +59,7 @@ public class FileAttachmentService {
             Path filePath = Paths.get(uploadDir, fileName);
 
             Files.copy(file.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
-            return filePath.toString();
+            return uploadAccessUrl + fileName;
         } catch (IOException e){
             throw new FileStorageException("Error saving file", e);
         }

@@ -12,11 +12,15 @@ public class WebConfig implements WebMvcConfigurer {
     @Value("${app.cors.allowed-origins}")
     private String[] allowedOrigins;
 
+    @Value("${file.upload-dir}")
+    private String uploadDir;
+
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        String resourcePath = "file:///" + uploadDir.replace("\\", "/") + "/";
         registry
                 .addResourceHandler("/uploads/**")
-                .addResourceLocations("file:uploads/");
+                .addResourceLocations(resourcePath);
     }
 
     @Override
