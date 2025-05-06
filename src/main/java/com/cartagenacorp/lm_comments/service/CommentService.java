@@ -14,6 +14,7 @@ import com.cartagenacorp.lm_comments.repository.CommentResponsesRepository;
 import com.cartagenacorp.lm_comments.util.JwtContextHolder;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -24,6 +25,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -92,6 +94,9 @@ public class CommentService {
         return new PageResponseDTO<>(dtoPage);
     }
 
+    @Value("${file.upload-dir}")
+    private String uploadDir;
+
     @Transactional
     public void deleteComment(UUID commentId) {
         Comment comment = commentRepository.findById(commentId)
@@ -101,7 +106,8 @@ public class CommentService {
         if (attachments != null) {
             for (FileAttachment attachment : attachments) {
                 try {
-                    Files.deleteIfExists(Paths.get(attachment.getFileUrl()));
+                    Path filePath = Paths.get(uploadDir, attachment.getFileName());
+                    Files.deleteIfExists(filePath);
                 } catch (IOException e) {
                     System.err.println("The file could not be deleted: " + attachment.getFileUrl());
                     e.printStackTrace();
