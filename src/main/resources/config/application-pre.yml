@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: lm-comments
+  datasource:
+    url: jdbc:postgresql://localhost:5433/lamuralla
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+  jpa:
+    hibernate:
+      ddl-auto: update
+    open-in-view: 'false'
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 5MB
+server:
+  port: '8084'
+file:
+  upload-dir: C:/Users/Diego/Desktop/app-uploads
+app:
+  upload-access-url: https://lm-comments.cartagenacorporation.com/uploads/
+  cors:
+    allowed-origins: https://cartagenacorporation.com
+  jwt:
+    secret: ${JWT_SECRET}
+auth:
+  service:
+    url: https://lm-oauth.cartagenacorporation.com/api/oauth
+issues:
+  service:
+    url: https://lm-issues.cartagenacorporation.com/api/issues
