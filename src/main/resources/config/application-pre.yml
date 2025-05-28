@@ -16,16 +16,16 @@ spring:
 server:
   port: '8084'
 file:
-  upload-dir: C:/Users/Diego/Desktop/app-uploads
+  upload-dir: C:/lamuralla/app-uploads
 app:
-  upload-access-url: https://lm-comments.cartagenacorporation.com/uploads/
+  upload-access-url: http://localhost:8084/uploads/
   cors:
-    allowed-origins: https://cartagenacorporation.com
+    allowed-origins: https://cartagenacorporation.com,https://www.cartagenacorporation.com
   jwt:
     secret: ${JWT_SECRET}
 auth:
   service:
-    url: https://lm-oauth.cartagenacorporation.com/api/oauth
+    url: http://localhost:8081/api/oauth
 issues:
   service:
-    url: https://lm-issues.cartagenacorporation.com/api/issues
+    url: http://localhost:8090/api/issues
