@@ -16,7 +16,7 @@ spring:
 server:
   port: '8084'
 file:
-  upload-dir: C:/lamuralla/app-uploads
+  upload-dir: /opt/la-muralla/uploads
 app:
   upload-access-url: http://localhost:8084/uploads/
   cors:
