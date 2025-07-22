@@ -13,6 +13,8 @@ import com.cartagenacorp.lm_comments.repository.CommentRepository;
 import com.cartagenacorp.lm_comments.repository.CommentResponsesRepository;
 import com.cartagenacorp.lm_comments.util.JwtContextHolder;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
@@ -34,6 +36,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class CommentService {
+
+    private static final Logger logger = LoggerFactory.getLogger(CommentService.class);
 
     private final CommentRepository commentRepository;
     private final FileAttachmentService fileAttachmentService;
@@ -109,8 +113,7 @@ public class CommentService {
                     Path filePath = Paths.get(uploadDir, attachment.getFileName());
                     Files.deleteIfExists(filePath);
                 } catch (IOException e) {
-                    System.err.println("The file could not be deleted: " + attachment.getFileUrl());
-                    e.printStackTrace();
+                    logger.warn("The file could not be deleted: {}", attachment.getFileUrl(), e);
                 }
             }
         }
@@ -205,4 +208,25 @@ public class CommentService {
 
         return responsesDto;
     }
+
+    @Transactional
+    public void deleteCommentsByIssueId(UUID issueId) {
+        List<Comment> comments = commentRepository.findByIssueId(issueId);
+
+        for (Comment comment : comments) {
+            if (comment.getAttachments() != null) {
+                for (FileAttachment attachment : comment.getAttachments()) {
+                    try {
+                        Path filePath = Paths.get(uploadDir, attachment.getFileName());
+                        Files.deleteIfExists(filePath);
+                    } catch (IOException e) {
+                        logger.warn("The file could not be deleted: {}", attachment.getFileUrl(), e);
+                    }
+                }
+            }
+        }
+
+        commentRepository.deleteAll(comments);
+    }
+
 }

@@ -44,11 +44,12 @@ public class FileAttachmentService {
 
         for (MultipartFile file : files) {
             logger.info("Procesando archivo: {}", file.getOriginalFilename());
-            String fileUrl = saveFileToStorage(file);
+            String fileName = saveFileToStorage(file);
+            String fileUrl = uploadAccessUrl + fileName;
 
             FileAttachment attachment = new FileAttachment();
             attachment.setComment(comment);
-            attachment.setFileName(file.getOriginalFilename());
+            attachment.setFileName(fileName);
             attachment.setFileUrl(fileUrl);
 
             FileAttachment saved = fileAttachmentRepository.save(attachment);
@@ -77,7 +78,7 @@ public class FileAttachmentService {
 
             String fileAccessUrl = uploadAccessUrl + fileName;
             logger.info("Archivo guardado correctamente. URL de acceso: {}", fileAccessUrl);
-            return fileAccessUrl;
+            return fileName;
         } catch (IOException e){
             logger.error("Error al guardar archivo: {}", file.getOriginalFilename(), e);
             throw new FileStorageException("Error guardando el archivo: " + file.getOriginalFilename(), e);

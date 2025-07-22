@@ -114,4 +114,11 @@ public class CommentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An unexpected error occurred: " + ex.getMessage());
         }
     }
+
+    @DeleteMapping("/internal/issues/{issueId}/comments")
+    @RequiresPermission({"COMMENT_CRUD"})
+    public ResponseEntity<Void> deleteCommentsByIssue(@PathVariable UUID issueId) {
+        commentService.deleteCommentsByIssueId(issueId);
+        return ResponseEntity.noContent().build();
+    }
 }
