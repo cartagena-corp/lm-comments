@@ -37,4 +37,7 @@ public class Comment {
 
     @OneToMany(mappedBy = "comment", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CommentResponses> responses = new ArrayList<>();
+
+    @Column(name = "organization_id")
+    private UUID organizationId;
 }

@@ -39,30 +39,72 @@ public class CommentService {
 
     private static final Logger logger = LoggerFactory.getLogger(CommentService.class);
 
+    @Value("${file.upload-dir}")
+    private String uploadDir;
+
     private final CommentRepository commentRepository;
     private final FileAttachmentService fileAttachmentService;
     private final CommentMapper commentMapper;
     private final CommentResponsesRepository commentResponsesRepository;
     private final CommentResponsesMapper commentResponsesMapper;
-    private final UserValidationService userValidationService;
-    private final IssueValidationService issueValidationService;
+    private final UserExternalService userExternalService;
+    private final IssueExternalService issueExternalService;
 
     @Autowired
     public CommentService(CommentRepository commentRepository, FileAttachmentService fileAttachmentService,
                           CommentMapper commentMapper, CommentResponsesRepository commentResponsesRepository,
-                          CommentResponsesMapper commentResponsesMapper, UserValidationService userValidationService,
-                          IssueValidationService issueValidationService) {
+                          CommentResponsesMapper commentResponsesMapper, UserExternalService userExternalService,
+                          IssueExternalService issueExternalService) {
         this.commentRepository = commentRepository;
         this.fileAttachmentService = fileAttachmentService;
         this.commentMapper = commentMapper;
         this.commentResponsesRepository = commentResponsesRepository;
         this.commentResponsesMapper = commentResponsesMapper;
-        this.userValidationService = userValidationService;
-        this.issueValidationService = issueValidationService;
+        this.userExternalService = userExternalService;
+        this.issueExternalService = issueExternalService;
+    }
+
+    @Transactional
+    public CommentDTO saveComment(CommentDTO commentDTO, MultipartFile[] files) {
+        UUID userId = JwtContextHolder.getUserId();
+        String token = JwtContextHolder.getToken();
+        UUID organizationId = JwtContextHolder.getOrganizationId();
+
+        if (!issueExternalService.validateIssueExists(commentDTO.getIssueId(), token)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The issue ID provided is not valid");
+        }
+
+        if (!issueExternalService.validateIssueAccess(commentDTO.getIssueId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to access the content of this issue");
+        }
+
+        commentDTO.setUserId(userId);
+        commentDTO.setOrganizationId(organizationId);
+        commentDTO.setCreatedAt(LocalDateTime.now());
+        Comment comment = commentMapper.commentDTOToComment(commentDTO);
+        commentRepository.save(comment);
+
+        if (files != null) {
+            List<FileAttachment> attachments = fileAttachmentService.saveFiles(comment, files);
+            comment.setAttachments(attachments);
+        }
+        Comment savedComment = commentRepository.save(comment);
+        CommentDTO savedDto = commentMapper.commentToCommentDTO(savedComment);
+
+        List<UserBasicDataDto> users = userExternalService.getUsersData(JwtContextHolder.getToken(), List.of(userId.toString()));
+        if (!users.isEmpty()) {
+            savedDto.setUser(users.get(0));
+        }
+
+        return savedDto;
     }
 
     @Transactional(readOnly = true)
     public PageResponseDTO<CommentDTO> getCommentsByIssueId(UUID issueId, Pageable pageable) {
+        if (!issueExternalService.validateIssueAccess(issueId, JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to access the content of this issue");
+        }
+
         Page<Comment> commentPage = commentRepository.findByIssueId(issueId, pageable);
         Page<CommentDTO> dtoPage = commentPage.map(commentMapper::commentToCommentDTO);
 
@@ -82,29 +124,33 @@ public class CommentService {
                 .distinct()
                 .toList();
 
-        userValidationService.getUsersData(JwtContextHolder.getToken(),
-                        userIds.stream().map(UUID::toString).toList())
-                .ifPresent(users -> {
-                    Map<UUID, UserBasicDataDto> userMap = users.stream()
-                            .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
+        List<UserBasicDataDto> users = userExternalService.getUsersData(
+                JwtContextHolder.getToken(),
+                userIds.stream().map(UUID::toString).toList()
+        );
 
-                    dtoPage.forEach(dto -> {
-                        UserBasicDataDto user = userMap.get(dto.getUserId());
-                        dto.setUser(user);
-                        dto.setResponsesCount(responseCounts.getOrDefault(dto.getId(), 0L).intValue());
-                    });
-                });
+        if (!users.isEmpty()) {
+            Map<UUID, UserBasicDataDto> userMap = users.stream()
+                    .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
+
+            dtoPage.forEach(dto -> {
+                UserBasicDataDto user = userMap.get(dto.getUserId());
+                dto.setUser(user);
+                dto.setResponsesCount(responseCounts.getOrDefault(dto.getId(), 0L).intValue());
+            });
+        }
 
         return new PageResponseDTO<>(dtoPage);
     }
-
-    @Value("${file.upload-dir}")
-    private String uploadDir;
 
     @Transactional
     public void deleteComment(UUID commentId) {
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found"));
+
+        if (!issueExternalService.validateIssueAccess(comment.getIssueId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to access the content of this issue");
+        }
 
         List<FileAttachment> attachments = comment.getAttachments();
         if (attachments != null) {
@@ -122,37 +168,40 @@ public class CommentService {
     }
 
     @Transactional
-    public CommentDTO saveComment(CommentDTO commentDTO, MultipartFile[] files) {
+    public CommentResponsesDto saveResponse(CommentResponsesDto responseDto) {
         UUID userId = JwtContextHolder.getUserId();
 
-        if (!issueValidationService.validateIssueExists(commentDTO.getIssueId())) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "The issue ID provided is not valid");
+        Comment comment = commentRepository.findById(responseDto.getCommentId())
+                .orElseThrow(() -> new EntityNotFoundException("Comment not found"));
+
+        if (!issueExternalService.validateIssueAccess(comment.getIssueId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to access the content of this issue");
         }
 
-        commentDTO.setUserId(userId);
-        commentDTO.setCreatedAt(LocalDateTime.now());
-        Comment comment = commentMapper.commentDTOToComment(commentDTO);
-        commentRepository.save(comment);
+        responseDto.setUserId(userId);
+        responseDto.setCreatedAt(LocalDateTime.now());
+        CommentResponses response = commentResponsesMapper.toEntity(responseDto);
+        response.setComment(comment);
+        commentResponsesRepository.save(response);
 
-        if (files != null) {
-            List<FileAttachment> attachments = fileAttachmentService.saveFiles(comment, files);
-            comment.setAttachments(attachments);
+        CommentResponsesDto responsesDto = commentResponsesMapper.toDto(response);
+
+        List<UserBasicDataDto> users = userExternalService.getUsersData(JwtContextHolder.getToken(), List.of(userId.toString()));
+        if (!users.isEmpty()) {
+            responsesDto.setUser(users.get(0));
         }
-        Comment savedComment = commentRepository.save(comment);
-        CommentDTO savedDto = commentMapper.commentToCommentDTO(savedComment);
 
-        userValidationService.getUsersData(JwtContextHolder.getToken(), List.of(userId.toString()))
-                .ifPresent(users -> {
-                    if (!users.isEmpty()) {
-                        savedDto.setUser(users.get(0));
-                    }
-                });
-
-        return savedDto;
+        return responsesDto;
     }
 
     @Transactional(readOnly = true)
     public List<CommentResponsesDto> getResponsesByCommentId(UUID commentId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found"));
+
+        if (!issueExternalService.validateIssueAccess(comment.getIssueId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to access the content of this issue");
+        }
 
         List<CommentResponses> responses = commentResponsesRepository.findByCommentId(commentId);
         List<CommentResponsesDto> responsesDtos = responses.stream()
@@ -164,10 +213,10 @@ public class CommentService {
                 .distinct()
                 .collect(Collectors.toList());
 
-        Optional<List<UserBasicDataDto>> usersOpt = userValidationService.getUsersData(JwtContextHolder.getToken(), userIds);
+        List<UserBasicDataDto> users = userExternalService.getUsersData(JwtContextHolder.getToken(), userIds);
 
-        if (usersOpt.isPresent()) {
-            Map<UUID, UserBasicDataDto> userMap = usersOpt.get().stream()
+        if (!users.isEmpty()) {
+            Map<UUID, UserBasicDataDto> userMap = users.stream()
                     .collect(Collectors.toMap(UserBasicDataDto::getId, Function.identity()));
 
             responsesDtos.forEach(dto -> dto.setUser(userMap.get(dto.getUserId())));
@@ -181,36 +230,23 @@ public class CommentService {
         CommentResponses response = commentResponsesRepository.findById(responseId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Response not found"));
 
+        Comment comment = commentRepository.findById(response.getComment().getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found"));
+
+        if (!issueExternalService.validateIssueAccess(comment.getIssueId(), JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You do not have permission to access the content of this issue");
+        }
+
         commentResponsesRepository.delete(response);
     }
 
     @Transactional
-    public CommentResponsesDto saveResponse(CommentResponsesDto responseDto) {
-        UUID userId = JwtContextHolder.getUserId();
-
-        Comment comment = commentRepository.findById(responseDto.getCommentId())
-                .orElseThrow(() -> new EntityNotFoundException("Comment not found"));
-
-        responseDto.setUserId(userId);
-        responseDto.setCreatedAt(LocalDateTime.now());
-        CommentResponses response = commentResponsesMapper.toEntity(responseDto);
-        response.setComment(comment);
-        commentResponsesRepository.save(response);
-
-        CommentResponsesDto responsesDto = commentResponsesMapper.toDto(response);
-
-        userValidationService.getUsersData(JwtContextHolder.getToken(), List.of(userId.toString()))
-                .ifPresent(users -> {
-                    if (!users.isEmpty()) {
-                        responsesDto.setUser(users.get(0));
-                    }
-                });
-
-        return responsesDto;
-    }
-
-    @Transactional
     public void deleteCommentsByIssueId(UUID issueId) {
+        if (!issueExternalService.validateIssueAccess(issueId, JwtContextHolder.getToken())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "You do not have permission to access the content of this issue");
+        }
+
         List<Comment> comments = commentRepository.findByIssueId(issueId);
 
         for (Comment comment : comments) {
@@ -224,9 +260,9 @@ public class CommentService {
                     }
                 }
             }
-        }
 
-        commentRepository.deleteAll(comments);
+            commentRepository.delete(comment);
+        }
     }
 
 }
