@@ -20,4 +20,5 @@ public class CommentDTO {
     private List<FileAttachmentDTO> attachments;
     private UserBasicDataDto user;
     private Integer responsesCount;
+    private UUID organizationId;
 }

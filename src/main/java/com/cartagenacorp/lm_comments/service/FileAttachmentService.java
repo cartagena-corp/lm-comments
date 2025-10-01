@@ -6,7 +6,6 @@ import com.cartagenacorp.lm_comments.exception.FileStorageException;
 import com.cartagenacorp.lm_comments.repository.FileAttachmentRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -33,7 +32,6 @@ public class FileAttachmentService {
     @Value("${app.upload-access-url}")
     private String uploadAccessUrl;
 
-    @Autowired
     public FileAttachmentService(FileAttachmentRepository fileAttachmentRepository) {
         this.fileAttachmentRepository = fileAttachmentRepository;
     }
